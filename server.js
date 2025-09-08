@@ -7,9 +7,10 @@ const dotenv = require('dotenv');
 dotenv.config({ path: './config.env' });
 
 // Import routes
-const authRoutes = require('./routes/auth');
-const attendanceRoutes = require('./routes/attendance');
-const userRoutes = require('./routes/user');
+const authRoutes = require('./routes/authRouter');
+const attendanceRoutes = require('./routes/attendanceRouter');
+const userRoutes = require('./routes/userRouter');
+const feeRoutes = require('./routes/feeRouter')
 
 // Import automation service
 const attendanceAutomationService = require('./services/attendanceAutomation');
@@ -58,6 +59,7 @@ mongoose.connection.on('disconnected', () => {
 app.use('/api/auth', authRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/user', userRoutes); 
+app.use('/api/fee',feeRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
