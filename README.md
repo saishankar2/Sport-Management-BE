@@ -1,238 +1,274 @@
 # Sport Management Backend API
+A robust Node.js, Express, and MongoDB-based REST API for a complete sports management application. It features comprehensive user management, automated attendance tracking, and a full fee management system.
 
-A Node.js, Express, and MongoDB-based REST API for sport management with comprehensive authentication and user management features.
+## Key Features
+🔐 JWT Authentication: Secure login/logout and password management with JSON Web Tokens.
 
-## Features
+👥 User Lifecycle Management: Clean separation of user registration and profile management from authentication.
 
-- 🔐 **JWT Authentication** - Secure login/logout with JSON Web Tokens
-- 👥 **User Management** - Registration, profile management, and role-based access control
-- 🔒 **Password Security** - Bcrypt hashing with salt rounds
-- ✅ **Input Validation** - Express-validator for request validation
-- 🛡️ **Route Protection** - Middleware for securing private endpoints
-- 📊 **MongoDB Integration** - Mongoose ODM with proper schemas
-- 🌐 **CORS Support** - Cross-origin resource sharing enabled
-- 📝 **Comprehensive Logging** - Error handling and request logging
+📅 Automated Attendance System: Detailed attendance tracking (present, absent, late, excused) with an automated service to mark absentees on a 6-day work week (Mon-Sat).
+
+💰 Fee Management System: Automatic fee record creation upon user registration with a default due date of one month. Includes endpoints for admins to manage payments.
+
+🛡️ Role-Based Access Control: Granular control with user and admin roles, protected by middleware.
+
+✅ Robust Input Validation: express-validator used across all routes to ensure data integrity.
+
+🏗️ MVC Architecture: Clean separation of concerns with logic in controllers and endpoint definitions in routes.
+
+📊 MongoDB Integration: Mongoose ODM with clear, well-defined schemas for Users, Attendance, and Fees.
 
 ## Prerequisites
+Node.js (v14 or higher)
 
-- Node.js (v14 or higher)
-- MongoDB (v4.4 or higher)
-- npm or yarn package manager
+MongoDB (v4.4 or higher)
+
+npm or yarn
 
 ## Installation
+Clone the repository
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd Sport-Management-BE
-   ```
+git clone <repository-url>
+cd Sport-Management-BE
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+## Install dependencies
 
-3. **Environment Configuration**
-   - Copy `config.env` and update the values:
-   ```bash
-   cp config.env .env
-   ```
-   - Update the following variables:
-     - `MONGODB_URI`: Your MongoDB connection string
-     - `JWT_SECRET`: A strong secret key for JWT signing
-     - `PORT`: Server port (default: 3000)
+npm install
 
-4. **Start MongoDB**
-   - Ensure MongoDB is running on your system
-   - Default connection: `mongodb://localhost:27017/sport-management`
+Environment Configuration
 
-5. **Run the application**
-   ```bash
-   # Development mode (with auto-restart)
-   npm run dev
-   
-   # Production mode
-   npm start
-   ```
+Create a .env file in the root directory and add the following variables:
 
-## API Endpoints
+PORT=3000
+MONGODB_URI=mongodb://localhost:27017/sport-management
+JWT_SECRET=your_super_strong_jwt_secret
+JWT_EXPIRE=30m
 
-### Authentication Routes
+Run the application
 
-| Method | Endpoint | Description | Access |
-|--------|----------|-------------|---------|
-| `POST` | `/api/auth/register` | Register a new user | Public |
-| `POST` | `/api/auth/login` | Login user | Public |
-| `POST` | `/api/auth/logout` | Logout user | Private |
-| `GET` | `/api/auth/me` | Get current user profile | Private |
-| `PUT` | `/api/auth/me` | Update user profile | Private |
-| `POST` | `/api/auth/change-password` | Change user password | Private |
+# For development with auto-reloading
+npm run dev
 
-### Health Check
+# For production
+npm start
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/health` | Server health status |
+API Endpoints
+All endpoints are prefixed with /api.
 
-## API Usage Examples
+User Routes (/user)
+Method
 
-### 1. User Registration
+Endpoint
 
-```bash
-curl -X POST http://localhost:3000/api/auth/register \
+Description
+
+Access
+
+POST
+
+/register
+
+Register a new user
+
+Public
+
+GET
+
+/me
+
+Get current user's profile
+
+Private
+
+PUT
+
+/me
+
+Update current user's profile
+
+Private
+
+GET
+
+/all
+
+Get a list of all users
+
+Admin
+
+Authentication Routes (/auth)
+Method
+
+Endpoint
+
+Description
+
+Access
+
+POST
+
+/login
+
+Login an existing user
+
+Public
+
+POST
+
+/logout
+
+Logout the current user
+
+Private
+
+POST
+
+/change-password
+
+Change the current user's password
+
+Private
+
+Fee Routes (/fees)
+Method
+
+Endpoint
+
+Description
+
+Access
+
+GET
+
+/
+
+Get all fee records (with filters)
+
+Admin
+
+POST
+
+/
+
+Manually create a new fee record
+
+Admin
+
+GET
+
+/:id
+
+Get a single fee record by ID
+
+Private
+
+PATCH
+
+/:id
+
+Update a fee record (e.g., payment)
+
+Admin
+
+DELETE
+
+/:id
+
+Delete a fee record
+
+Admin
+
+Attendance Routes (/attendance)
+See the detailed ATTENDANCE_README.md for a full list of over 15 endpoints for detailed weekly, monthly, and yearly reporting for individuals and the entire organization.
+
+API Usage Examples
+1. Register a New User
+POST /api/user/register
+
+curl -X POST http://localhost:3000/api/user/register \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "user@example.com",
+    "email": "athlete@example.com",
     "password": "password123",
-    "firstName": "John",
-    "lastName": "Doe",
-    "role": "user"
+    "firstName": "Alex",
+    "lastName": "Ray"
   }'
-```
 
-**Response:**
-```json
-{
-  "status": "success",
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "data": {
-    "user": {
-      "_id": "64f1a2b3c4d5e6f7g8h9i0j1",
-      "email": "user@example.com",
-      "firstName": "John",
-      "lastName": "Doe",
-      "role": "user",
-      "isActive": true,
-      "createdAt": "2023-09-01T10:00:00.000Z",
-      "updatedAt": "2023-09-01T10:00:00.000Z"
-    }
-  }
-}
-```
+This will automatically create a corresponding fee record for this user with a status of pending and a dueDate one month from today.
 
-### 2. User Login
+2. Login
+POST /api/auth/login
 
-```bash
 curl -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "user@example.com",
+    "email": "athlete@example.com",
     "password": "password123"
   }'
-```
 
-### 3. Access Protected Route
+3. Update a Fee Payment (Admin)
+PATCH /api/fees/:feeId
 
-```bash
-curl -X GET http://localhost:3000/api/auth/me \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
-```
-
-### 4. Update Profile
-
-```bash
-curl -X PUT http://localhost:3000/api/auth/me \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+curl -X PATCH http://localhost:3000/api/fees/60c72b2f9b1d8c001f8e4b1a \
+  -H "Authorization: Bearer YOUR_ADMIN_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "firstName": "Jane",
-    "lastName": "Smith"
+    "status": "paid",
+    "transactionId": "txn_123456789"
   }'
-```
 
-### 5. Change Password
-
-```bash
-curl -X POST http://localhost:3000/api/auth/change-password \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "currentPassword": "password123",
-    "newPassword": "newpassword456"
-  }'
-```
-
-## Data Models
-
-### User Schema
-
-```javascript
+Data Models
+User Schema
 {
-  email: String (required, unique, validated),
-  password: String (required, min 6 chars, hashed),
-  firstName: String (required, max 50 chars),
-  lastName: String (required, max 50 chars),
-  role: String (enum: 'user', 'admin', 'coach', default: 'user'),
-  isActive: Boolean (default: true),
-  lastLogin: Date,
-  createdAt: Date (auto),
-  updatedAt: Date (auto)
+  email: String (required, unique),
+  password: String (required, hashed),
+  firstName: String (required),
+  lastName: String (required),
+  role: String (enum: ['user', 'admin'], default: 'user'),
+  isActive: Boolean (default: true)
 }
-```
 
-## Security Features
-
-- **Password Hashing**: Bcrypt with 12 salt rounds
-- **JWT Tokens**: Secure authentication with configurable expiration
-- **Input Validation**: Comprehensive request validation
-- **CORS Protection**: Configurable cross-origin settings
-- **Role-based Access**: Granular permission control
-- **Account Status**: User account activation/deactivation
-
-## Error Handling
-
-The API provides consistent error responses:
-
-```json
+Fee Schema
 {
-  "status": "error",
-  "message": "Descriptive error message",
-  "errors": [] // Validation errors (if applicable)
+  user: ObjectId (ref: 'User'),
+  amount: Number (required, default: 2600),
+  status: String (enum: ['pending', 'paid', 'overdue'], default: 'pending'),
+  dueDate: Date (required, default: 1 month from creation),
+  paidDate: Date,
+  transactionId: String
 }
-```
 
-## Development
+Attendance Schema
+{
+  user: ObjectId (ref: 'User'),
+  date: Date (required),
+  status: String (enum: ['present', 'absent', 'late', 'excused']),
+  notes: String,
+  markedBy: ObjectId (ref: 'User'),
+  isAutoMarked: Boolean (default: false)
+}
 
-### Project Structure
-
-```
-Sport-Management-BE/
-├── models/          # Mongoose schemas
-├── routes/          # Express routes
-├── middleware/      # Custom middleware
-├── config.env       # Environment variables
-├── package.json     # Dependencies and scripts
-├── server.js        # Main application file
-└── README.md        # This file
-```
-
-### Available Scripts
-
-- `npm start` - Start production server
-- `npm run dev` - Start development server with nodemon
-- `npm test` - Run tests (to be implemented)
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` | Server port | 3000 |
-| `MONGODB_URI` | MongoDB connection string | mongodb://localhost:27017/sport-management |
-| `JWT_SECRET` | JWT signing secret | (required) |
-| `JWT_EXPIRE` | JWT expiration time | 24h |
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License.
-
-## Support
-
-For support and questions, please open an issue in the repository. 
+Project Structure
+.
+├── controllers/
+│   ├── attendanceController.js
+│   ├── authController.js
+│   ├── feeController.js
+│   └── userController.js
+├── middleware/
+│   ├── adminAuth.js
+│   └── auth.js
+├── models/
+│   ├── Attendance.js
+│   ├── Fee.js
+│   └── User.js
+├── routes/
+│   ├── attendance.js
+│   ├── auth.js
+│   ├── fee.js
+│   └── user.js
+├── services/
+│   └── attendanceAutomation.js
+├── .env
+├── package.json
+└── server.js
