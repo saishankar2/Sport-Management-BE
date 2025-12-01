@@ -10,6 +10,7 @@ const {
   getAllAttendanceForUser,
   updateAttendance,
   deleteAttendance,
+  getDailyOverview,
   getWeeklyOverview,
   getMonthlyOverview,
   getYearlyOverview,
@@ -32,7 +33,7 @@ router.post(
   requireAdmin,
   [
     body('userId').isMongoId().withMessage('Valid user ID is required'),
-    body('date').isISO8601().withMessage('Valid date is required'),
+    // body('date').isISO8601().withMessage('Valid date is required'),
     body('status')
       .isIn(['present', 'absent', 'late', 'excused'])
       .withMessage('Valid status is required'),
@@ -105,6 +106,7 @@ router.delete('/:attendanceId', requireAdmin, deleteAttendance);
 
 // ===== ORGANIZATION-WIDE ATTENDANCE ENDPOINTS (Admin Only) =====
 
+router.get('/overview/daily', requireAdmin, getDailyOverview)
 // GET ALL USERS' WEEKLY ATTENDANCE (Admin only)
 router.get('/overview/weekly', requireAdmin, getWeeklyOverview);
 

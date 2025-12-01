@@ -38,9 +38,9 @@ exports.markAttendance = async (req, res) => {
             existingAttendance.status = status;
             existingAttendance.notes = notes || existingAttendance.notes;
             existingAttendance.markedBy = adminId;
-            
+
             await existingAttendance.save();
-            
+
             return res.json({
                 success: true,
                 message: 'Attendance updated successfully',
@@ -51,7 +51,7 @@ exports.markAttendance = async (req, res) => {
         // Create new attendance record
         const attendance = new Attendance({
             user: userId,
-            date: attendanceDate,
+            // date: attendanceDate,
             status,
             notes,
             markedBy: adminId
@@ -75,7 +75,7 @@ exports.markAttendance = async (req, res) => {
                 message: 'Attendance already exists for this user and date'
             });
         }
-        
+
         res.status(500).json({
             success: false,
             message: 'Error marking attendance',
@@ -184,7 +184,7 @@ exports.markMultipleAttendance = async (req, res) => {
 exports.getAttendanceStats = async (req, res) => {
     try {
         let userId = req.params.userId;
-        
+
         // If no userId provided, use the authenticated user's ID
         if (!userId) {
             userId = req.user.id;
@@ -199,7 +199,7 @@ exports.getAttendanceStats = async (req, res) => {
         }
 
         const { startDate, endDate } = req.query;
-        
+
         if (!startDate || !endDate) {
             return res.status(400).json({
                 success: false,
@@ -230,7 +230,7 @@ exports.getAttendanceStats = async (req, res) => {
 exports.getWeeklyAttendance = async (req, res) => {
     try {
         let userId = req.params.userId;
-        
+
         if (!userId) {
             userId = req.user.id;
         } else {
@@ -244,7 +244,7 @@ exports.getWeeklyAttendance = async (req, res) => {
 
         const { weekStart } = req.query;
         const weekStartDate = weekStart ? new Date(weekStart) : new Date();
-        
+
         // Set to start of week (Monday)
         const day = weekStartDate.getDay();
         const diff = weekStartDate.getDate() - day + (day === 0 ? -6 : 1);
@@ -274,7 +274,7 @@ exports.getWeeklyAttendance = async (req, res) => {
 exports.getMonthlyAttendance = async (req, res) => {
     try {
         let userId = req.params.userId;
-        
+
         if (!userId) {
             userId = req.user.id;
         } else {
@@ -289,7 +289,7 @@ exports.getMonthlyAttendance = async (req, res) => {
         const { year, month } = req.query;
         const currentYear = new Date().getFullYear();
         const currentMonth = new Date().getMonth() + 1;
-        
+
         const targetYear = parseInt(year) || currentYear;
         const targetMonth = parseInt(month) || currentMonth;
 
@@ -316,7 +316,7 @@ exports.getMonthlyAttendance = async (req, res) => {
 exports.getYearlyAttendance = async (req, res) => {
     try {
         let userId = req.params.userId;
-        
+
         if (!userId) {
             userId = req.user.id;
         } else {
@@ -366,7 +366,7 @@ exports.getAllAttendanceForUser = async (req, res) => {
         }
 
         let query = { user: userId };
-        
+
         if (startDate && endDate) {
             query.date = {
                 $gte: new Date(startDate),
@@ -480,24 +480,80 @@ exports.deleteAttendance = async (req, res) => {
     }
 };
 
+exports.getDailyOverview = async (req, res) => {
+    try {
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0); // Sets time to 00:00:00.000
+
+        // 2. Get the end of today
+        const endOfToday = new Date();
+        endOfToday.setHours(23, 59, 59, 999);
+        // Get all users
+        const users = await User.find({ isActive: true }).select('firstName lastName email role');
+
+        // Get attendance for all users in the week
+        const todaysAttendance = await Attendance.find({
+            date: {
+                $gte: startOfToday,
+                $lte: endOfToday
+            }
+        });
+        const userAttendanceMap = new Map();
+        todaysAttendance.forEach(record => {
+            // Assumes 'record.user' is the ID
+            userAttendanceMap.set(record.user.toString(), {
+                status: record.status,
+                date: record.date
+            }); 
+        });
+
+        const dayAttendance = users.map(user => {
+            const attendanceRecord = userAttendanceMap.get(user._id.toString());
+
+            return {
+                id: user._id, // Use 'id' instead of '_id'
+                name: `${user.firstName} ${user.lastName}`,
+                role: user.role,
+                avatar: user.firstName.charAt(0).toUpperCase(),
+                // date: attendanceRecord ? attendanceRecord.date : null,
+                // This is the key: set status to the marked one, or 'Pending'
+                status: attendanceRecord ? attendanceRecord.status : 'Pending',
+            };
+        });
+
+        // Populate attendance data
+        res.json({
+            success: true,
+            data: dayAttendance
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching daily overview',
+            error: error.message
+        });
+    }
+};
+
 exports.getWeeklyOverview = async (req, res) => {
     try {
         const { weekStart } = req.query;
         const weekStartDate = weekStart ? new Date(weekStart) : new Date();
-        
+
         // Set to start of week (Monday)
         const day = weekStartDate.getDay();
         const diff = weekStartDate.getDate() - day + (day === 0 ? -6 : 1);
         weekStartDate.setDate(diff);
         weekStartDate.setHours(0, 0, 0, 0);
-        
+
         const weekEndDate = new Date(weekStartDate);
         weekEndDate.setDate(weekEndDate.getDate() + 6);
         weekEndDate.setHours(23, 59, 59, 999);
 
         // Get all users
         const users = await User.find({ isActive: true }).select('firstName lastName email role');
-        
+
         // Get attendance for all users in the week
         const attendance = await Attendance.find({
             date: { $gte: weekStartDate, $lte: weekEndDate }
@@ -505,7 +561,7 @@ exports.getWeeklyOverview = async (req, res) => {
 
         // Group attendance by user
         const userAttendanceMap = new Map();
-        
+
         // Initialize all users with empty attendance
         users.forEach(user => {
             userAttendanceMap.set(user._id.toString(), {
@@ -537,7 +593,7 @@ exports.getWeeklyOverview = async (req, res) => {
                     status: record.status,
                     notes: record.notes
                 });
-                
+
                 // Update summary
                 userData.summary.totalDays++;
                 userData.summary[record.status]++;
@@ -549,16 +605,16 @@ exports.getWeeklyOverview = async (req, res) => {
             ...userData,
             summary: {
                 ...userData.summary,
-                presentPercentage: userData.summary.totalDays > 0 
+                presentPercentage: userData.summary.totalDays > 0
                     ? Math.round((userData.summary.present / userData.summary.totalDays) * 100 * 100) / 100
                     : 0,
-                absentPercentage: userData.summary.totalDays > 0 
+                absentPercentage: userData.summary.totalDays > 0
                     ? Math.round((userData.summary.absent / userData.summary.totalDays) * 100 * 100) / 100
                     : 0,
-                latePercentage: userData.summary.totalDays > 0 
+                latePercentage: userData.summary.totalDays > 0
                     ? Math.round((userData.summary.late / userData.summary.totalDays) * 100 * 100) / 100
                     : 0,
-                excusedPercentage: userData.summary.totalDays > 0 
+                excusedPercentage: userData.summary.totalDays > 0
                     ? Math.round((userData.summary.excused / userData.summary.totalDays) * 100 * 100) / 100
                     : 0
             }
@@ -588,7 +644,7 @@ exports.getMonthlyOverview = async (req, res) => {
         const { year, month } = req.query;
         const currentYear = new Date().getFullYear();
         const currentMonth = new Date().getMonth() + 1;
-        
+
         const targetYear = parseInt(year) || currentYear;
         const targetMonth = parseInt(month) || currentMonth;
 
@@ -598,7 +654,7 @@ exports.getMonthlyOverview = async (req, res) => {
 
         // Get all users
         const users = await User.find({ isActive: true }).select('firstName lastName email role');
-        
+
         // Get attendance for all users in the month
         const attendance = await Attendance.find({
             date: { $gte: startDate, $lte: endDate }
@@ -606,7 +662,7 @@ exports.getMonthlyOverview = async (req, res) => {
 
         // Group attendance by user
         const userAttendanceMap = new Map();
-        
+
         // Initialize all users with empty attendance
         users.forEach(user => {
             userAttendanceMap.set(user._id.toString(), {
@@ -638,7 +694,7 @@ exports.getMonthlyOverview = async (req, res) => {
                     status: record.status,
                     notes: record.notes
                 });
-                
+
                 // Update summary
                 userData.summary.totalDays++;
                 userData.summary[record.status]++;
@@ -650,16 +706,16 @@ exports.getMonthlyOverview = async (req, res) => {
             ...userData,
             summary: {
                 ...userData.summary,
-                presentPercentage: userData.summary.totalDays > 0 
+                presentPercentage: userData.summary.totalDays > 0
                     ? Math.round((userData.summary.present / userData.summary.totalDays) * 100 * 100) / 100
                     : 0,
-                absentPercentage: userData.summary.totalDays > 0 
+                absentPercentage: userData.summary.totalDays > 0
                     ? Math.round((userData.summary.absent / userData.summary.totalDays) * 100 * 100) / 100
                     : 0,
-                latePercentage: userData.summary.totalDays > 0 
+                latePercentage: userData.summary.totalDays > 0
                     ? Math.round((userData.summary.late / userData.summary.totalDays) * 100 * 100) / 100
                     : 0,
-                excusedPercentage: userData.summary.totalDays > 0 
+                excusedPercentage: userData.summary.totalDays > 0
                     ? Math.round((userData.summary.excused / userData.summary.totalDays) * 100 * 100) / 100
                     : 0
             }
@@ -696,7 +752,7 @@ exports.getYearlyOverview = async (req, res) => {
 
         // Get all users
         const users = await User.find({ isActive: true }).select('firstName lastName email role');
-        
+
         // Get attendance for all users in the year
         const attendance = await Attendance.find({
             date: { $gte: startDate, $lte: endDate }
@@ -704,7 +760,7 @@ exports.getYearlyOverview = async (req, res) => {
 
         // Group attendance by user
         const userAttendanceMap = new Map();
-        
+
         // Initialize all users with empty attendance
         users.forEach(user => {
             userAttendanceMap.set(user._id.toString(), {
@@ -736,7 +792,7 @@ exports.getYearlyOverview = async (req, res) => {
                     status: record.status,
                     notes: record.notes
                 });
-                
+
                 // Update summary
                 userData.summary.totalDays++;
                 userData.summary[record.status]++;
@@ -748,16 +804,16 @@ exports.getYearlyOverview = async (req, res) => {
             ...userData,
             summary: {
                 ...userData.summary,
-                presentPercentage: userData.summary.totalDays > 0 
+                presentPercentage: userData.summary.totalDays > 0
                     ? Math.round((userData.summary.present / userData.summary.totalDays) * 100 * 100) / 100
                     : 0,
-                absentPercentage: userData.summary.totalDays > 0 
+                absentPercentage: userData.summary.totalDays > 0
                     ? Math.round((userData.summary.absent / userData.summary.totalDays) * 100 * 100) / 100
                     : 0,
-                latePercentage: userData.summary.totalDays > 0 
+                latePercentage: userData.summary.totalDays > 0
                     ? Math.round((userData.summary.late / userData.summary.totalDays) * 100 * 100) / 100
                     : 0,
-                excusedPercentage: userData.summary.totalDays > 0 
+                excusedPercentage: userData.summary.totalDays > 0
                     ? Math.round((userData.summary.excused / userData.summary.totalDays) * 100 * 100) / 100
                     : 0
             }
@@ -784,7 +840,7 @@ exports.getYearlyOverview = async (req, res) => {
 exports.getOrganizationStats = async (req, res) => {
     try {
         const { startDate, endDate } = req.query;
-        
+
         if (!startDate || !endDate) {
             return res.status(400).json({
                 success: false,
@@ -797,7 +853,7 @@ exports.getOrganizationStats = async (req, res) => {
 
         // Get all users
         const users = await User.find({ isActive: true }).select('firstName lastName email role');
-        
+
         // Get attendance for all users in the date range (excluding Sundays)
         const attendance = await Attendance.find({
             date: { $gte: start, $lte: end },
@@ -822,7 +878,7 @@ exports.getOrganizationStats = async (req, res) => {
 
         // Group by user for individual stats
         const userStatsMap = new Map();
-        
+
         // Initialize user stats
         users.forEach(user => {
             userStatsMap.set(user._id.toString(), {
@@ -845,11 +901,11 @@ exports.getOrganizationStats = async (req, res) => {
         // Calculate stats
         attendance.forEach(record => {
             const userId = record.user._id.toString();
-            
+
             // Update overall stats
             overallStats.totalDays++;
             overallStats[record.status]++;
-            
+
             // Update user stats
             if (userStatsMap.has(userId)) {
                 const userStats = userStatsMap.get(userId);
@@ -860,16 +916,16 @@ exports.getOrganizationStats = async (req, res) => {
 
         // Calculate overall percentages
         const overallPercentages = {
-            presentPercentage: overallStats.totalDays > 0 
+            presentPercentage: overallStats.totalDays > 0
                 ? Math.round((overallStats.present / overallStats.totalDays) * 100 * 100) / 100
                 : 0,
-            absentPercentage: overallStats.totalDays > 0 
+            absentPercentage: overallStats.totalDays > 0
                 ? Math.round((overallStats.absent / overallStats.totalDays) * 100 * 100) / 100
                 : 0,
-            latePercentage: overallStats.totalDays > 0 
+            latePercentage: overallStats.totalDays > 0
                 ? Math.round((overallStats.late / overallStats.totalDays) * 100 * 100) / 100
                 : 0,
-            excusedPercentage: overallStats.totalDays > 0 
+            excusedPercentage: overallStats.totalDays > 0
                 ? Math.round((overallStats.excused / overallStats.totalDays) * 100 * 100) / 100
                 : 0
         };
@@ -877,16 +933,16 @@ exports.getOrganizationStats = async (req, res) => {
         // Calculate user percentages
         const userStats = Array.from(userStatsMap.values()).map(userData => ({
             ...userData,
-            presentPercentage: userData.totalDays > 0 
+            presentPercentage: userData.totalDays > 0
                 ? Math.round((userData.present / userData.totalDays) * 100 * 100) / 100
                 : 0,
-            absentPercentage: userData.totalDays > 0 
+            absentPercentage: userData.totalDays > 0
                 ? Math.round((userData.absent / userData.totalDays) * 100 * 100) / 100
                 : 0,
-            latePercentage: userData.totalDays > 0 
+            latePercentage: userData.totalDays > 0
                 ? Math.round((userData.late / userData.totalDays) * 100 * 100) / 100
                 : 0,
-            excusedPercentage: userData.totalDays > 0 
+            excusedPercentage: userData.totalDays > 0
                 ? Math.round((userData.excused / userData.totalDays) * 100 * 100) / 100
                 : 0
         }));
@@ -923,13 +979,13 @@ exports.getOrganizationStats = async (req, res) => {
 exports.getWorkingDays = async (req, res) => {
     try {
         const { startDate, endDate, year, month } = req.query;
-        
+
         if (startDate && endDate) {
             // Get working days for date range
             const start = new Date(startDate);
             const end = new Date(endDate);
             const workingDays = Attendance.getWorkingDaysCount(start, end);
-            
+
             res.json({
                 success: true,
                 data: {
@@ -942,7 +998,7 @@ exports.getWorkingDays = async (req, res) => {
         } else if (year && month) {
             // Get working days for specific month
             const workingDays = Attendance.getWorkingDaysInMonth(parseInt(year), parseInt(month));
-            
+
             res.json({
                 success: true,
                 data: {
@@ -957,7 +1013,7 @@ exports.getWorkingDays = async (req, res) => {
         } else if (year) {
             // Get working days for specific year
             const workingDays = Attendance.getWorkingDaysInYear(parseInt(year));
-            
+
             res.json({
                 success: true,
                 data: {
@@ -971,7 +1027,7 @@ exports.getWorkingDays = async (req, res) => {
             // Get current week working days
             const today = new Date();
             const workingDays = Attendance.getWorkingDaysInWeek(today);
-            
+
             res.json({
                 success: true,
                 data: {
@@ -996,7 +1052,7 @@ exports.getWorkingDays = async (req, res) => {
 exports.getAutomationStatus = async (req, res) => {
     try {
         const status = attendanceAutomationService.getStatus();
-        
+
         res.json({
             success: true,
             data: status
@@ -1022,10 +1078,10 @@ exports.triggerAutomation = async (req, res) => {
         }
 
         const { type } = req.body;
-        
+
         // Run the manual check
         await attendanceAutomationService.runManualCheck(type);
-        
+
         res.json({
             success: true,
             message: `Manual ${type} attendance check triggered successfully`,
